@@ -2,7 +2,7 @@ spring:
   application:
     name: backend
   datasource:
-    url: jdbc:postgresql://localhost:5432/moliyaviy
+    url: jdbc:postgresql://localhost:5432/moliyaviy?stringtype=unspecified
     username: moliyaviy
     password: moliyaviy
   jpa:
