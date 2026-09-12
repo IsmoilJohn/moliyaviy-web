@@ -5,7 +5,7 @@
 
 ## Стек
 
-- **Backend**: Java 21, Spring Boot 3.3 (Web, Data JPA, Validation, Actuator), Flyway, Maven
+- **Backend**: Java 21, Spring Boot 3.3 (Web, Data JPA, Validation, Actuator, Security), Flyway, JWT (jjwt), Maven
 - **Frontend**: Vue 3, TypeScript, Vite, Vue Router, Pinia, Axios, ESLint + Prettier
 - **База данных**: PostgreSQL 16
 - **Инфраструктура**: Docker / Docker Compose
@@ -63,22 +63,33 @@ npm run dev
 `(user_id, name)` на `(user_id, name, type)` — нужно, чтобы у пользователя
 могли быть отдельные категории «Прочее» для расходов и для доходов.
 
+## Аутентификация
+
+- `POST /api/users` — регистрация (email, password, fullName), публичный
+  эндпоинт. Пароль хешируется BCrypt, пользователю сразу создаются
+  категории по умолчанию.
+- `POST /api/auth/login` — вход (email, password) → JWT-токен
+  (`{"token", "tokenType": "Bearer", "user": {...}}`), подписан HS-ключом
+  (`app.jwt.secret`, живёт `app.jwt.expiration-ms` мс, по умолчанию час).
+
+Все остальные эндпоинты защищены и требуют заголовок
+`Authorization: Bearer <token>`. `userId` для транзакций/категорий/лимитов
+теперь берётся **из токена** (`JwtAuthenticationFilter` кладёт его в
+`SecurityContext`), а не из пути или тела запроса — так пользователь не
+может ни прочитать, ни изменить чужие данные (запрос к чужому ресурсу по
+id отдаёт `404`, а не `403`, чтобы не подтверждать факт его существования).
+Запрос без токена или с невалидным/просроченным токеном получает `401`.
+
 ## REST API
 
-- `POST /api/users` — создать пользователя (email, password, fullName);
-  пароль хешируется (BCrypt), пользователю сразу создаются категории по
-  умолчанию. Полноценной аутентификации (логин/JWT) пока нет — это
-  временная точка входа для регистрации.
-- `GET /api/users/{id}` — профиль пользователя
-- `GET/POST /api/users/{userId}/categories`,
-  `GET/PUT/DELETE /api/users/{userId}/categories/{id}` — CRUD категорий.
-  Удалить категорию нельзя, если на неё уже есть транзакции или лимит
-  (409 Conflict)
-- `GET/POST /api/users/{userId}/transactions`,
-  `GET/PUT/DELETE /api/users/{userId}/transactions/{id}` — CRUD транзакций
-- `GET/POST /api/users/{userId}/limits`,
-  `GET/PUT/DELETE /api/users/{userId}/limits/{id}` — CRUD месячных лимитов
-  (один лимит на категорию)
+- `GET /api/users/me` — профиль текущего пользователя
+- `GET/POST /api/categories`, `GET/PUT/DELETE /api/categories/{id}` — CRUD
+  категорий. Удалить категорию нельзя, если на неё уже есть транзакции или
+  лимит (409 Conflict)
+- `GET/POST /api/transactions`, `GET/PUT/DELETE /api/transactions/{id}` —
+  CRUD транзакций
+- `GET/POST /api/limits`, `GET/PUT/DELETE /api/limits/{id}` — CRUD
+  месячных лимитов (один лимит на категорию)
 
 ### Категории по умолчанию
 

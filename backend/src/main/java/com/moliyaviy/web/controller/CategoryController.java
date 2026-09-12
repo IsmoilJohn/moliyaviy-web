@@ -2,12 +2,14 @@ package com.moliyaviy.web.controller;
 
 import com.moliyaviy.web.dto.CategoryRequest;
 import com.moliyaviy.web.dto.CategoryResponse;
+import com.moliyaviy.web.security.CurrentUser;
 import com.moliyaviy.web.service.CategoryService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,38 +21,38 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/users/{userId}/categories")
+@RequestMapping("/api/categories")
 @RequiredArgsConstructor
 public class CategoryController {
 
     private final CategoryService categoryService;
 
     @GetMapping
-    public List<CategoryResponse> getAll(@PathVariable UUID userId) {
-        return categoryService.getAll(userId);
+    public List<CategoryResponse> getAll(Authentication authentication) {
+        return categoryService.getAll(CurrentUser.id(authentication));
     }
 
     @GetMapping("/{id}")
-    public CategoryResponse getById(@PathVariable UUID userId, @PathVariable UUID id) {
-        return categoryService.getById(userId, id);
+    public CategoryResponse getById(Authentication authentication, @PathVariable UUID id) {
+        return categoryService.getById(CurrentUser.id(authentication), id);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public CategoryResponse create(@PathVariable UUID userId, @Valid @RequestBody CategoryRequest request) {
-        return categoryService.create(userId, request);
+    public CategoryResponse create(Authentication authentication, @Valid @RequestBody CategoryRequest request) {
+        return categoryService.create(CurrentUser.id(authentication), request);
     }
 
     @PutMapping("/{id}")
-    public CategoryResponse update(@PathVariable UUID userId, @PathVariable UUID id,
+    public CategoryResponse update(Authentication authentication, @PathVariable UUID id,
                                     @Valid @RequestBody CategoryRequest request) {
-        return categoryService.update(userId, id, request);
+        return categoryService.update(CurrentUser.id(authentication), id, request);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable UUID userId, @PathVariable UUID id) {
-        categoryService.delete(userId, id);
+    public void delete(Authentication authentication, @PathVariable UUID id) {
+        categoryService.delete(CurrentUser.id(authentication), id);
     }
 
 }
