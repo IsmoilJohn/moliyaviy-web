@@ -1,8 +1,11 @@
-# moliyaviy-web
+# moliyaviy-web — Финансовый помощник
+
+Веб-приложение для учёта личных финансов: доходы/расходы по категориям,
+настраиваемые месячные лимиты и дашборд со статистикой.
 
 ## Стек
 
-- **Backend**: Java 21, Spring Boot 3.3 (Web, Data JPA, Validation, Actuator), Maven
+- **Backend**: Java 21, Spring Boot 3.3 (Web, Data JPA, Validation, Actuator), Flyway, Maven
 - **Frontend**: Vue 3, TypeScript, Vite, Vue Router, Pinia, Axios, ESLint + Prettier
 - **База данных**: PostgreSQL 16
 - **Инфраструктура**: Docker / Docker Compose
@@ -42,6 +45,19 @@ npm run dev
 ```
 
 Приложение будет доступно на `http://localhost:5173`, запросы к `/api/*` проксируются на backend (см. `vite.config.ts`).
+
+## Схема базы данных
+
+Миграции лежат в `backend/src/main/resources/db/migration/` (Flyway,
+применяются автоматически при старте backend). Начальная схема
+(`V1__init_schema.sql`) описывает таблицы:
+
+- **users** — пользователи (email, хэш пароля, имя)
+- **categories** — категории доходов/расходов, настраиваемые пользователем
+  (название, тип `INCOME`/`EXPENSE`, цвет для графиков)
+- **transactions** — транзакции (пользователь, категория, тип, сумма, дата,
+  комментарий)
+- **limits** — месячный лимит по категории расходов (один лимит на категорию)
 
 ## Сборка для продакшена
 
