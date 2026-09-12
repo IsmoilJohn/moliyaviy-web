@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -40,6 +41,11 @@ public class GlobalExceptionHandler {
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
                 .collect(Collectors.joining(", "));
         return ResponseEntity.badRequest().body(new ApiError(message));
+    }
+
+    @ExceptionHandler({InvalidRequestException.class, MissingServletRequestParameterException.class})
+    public ResponseEntity<ApiError> handleInvalidRequest(Exception ex) {
+        return ResponseEntity.badRequest().body(new ApiError(ex.getMessage()));
     }
 
 }
