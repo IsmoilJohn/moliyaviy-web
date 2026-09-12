@@ -16,6 +16,10 @@ frontend/coverage/
 .env.local
 *.env
 
+# Python
+__pycache__/
+*.pyc
+
 # IDE
 .idea/
 *.iml

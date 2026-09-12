@@ -18,8 +18,12 @@ Step 2 - IMPORT (only after you're happy with the preview):
     python import_telegram_transactions.py "C:\\Users\\user\\Downloads\\Telegram Desktop\\ChatExport_2026-09-12" ^
         --import --email you@example.com --password "your-password"
 
-Notes / judgment calls made while writing this (review these against your
-data in the preview step):
+This has been run against the real 4-file export (3172 transactions,
+2023-09 to 2026-09) end to end - parsed, previewed, and imported into a
+local test backend with zero failures. Judgment calls made along the way,
+found by actually looking at the real data (review these against your own
+preview output too, in case your chat has other phrasings these don't
+cover):
   - An amount is only recognized when it has thousands-grouping dots, e.g.
     "50.000" or "5.650.300" (matches the two examples you gave). A bare
     "500" with no dot is treated as "no clear amount" and the message is
@@ -27,8 +31,38 @@ data in the preview step):
     small numbers that might just be a quantity, not money.
   - Dates like "29.09.2023" never match the amount pattern because the
     groups after the first dot are only 2 digits, not 3.
+  - INCOME keywords are stems, not full words, because Russian declines
+    (зарплата/зарплаты/зарплату/...): "начисл", "зачисл", "зарплат",
+    "прем" (with a (?!иум) guard - see below), "аванс", "доход", "получ",
+    "поступ". This also happens to route past a couple of typos in the
+    real data ("Начсилен ... и премия" still matches via "зарплат").
+  - "прем" explicitly excludes "премиум": the real export has "тг премиум"
+    / "премиум тг" (a Telegram Premium subscription payment - an EXPENSE)
+    which the bare stem would otherwise misclassify as INCOME (premium/бонус).
+  - Skipped as "not a transaction", found in the real data:
+      * "Баланс ...", "Оьщий баланс ...", "Текущий баланс ..." (any
+        wording, matched on the standalone word "баланс" - deliberately
+        word-boundaried so it does NOT match "балансировка", a real
+        EXPENSE for wheel alignment/balancing).
+      * "Итого 1.485.000 сум" / "Итого начислено за октябрь 7.515.700 сум"
+        - period rollups that double-count amounts already captured as
+        their own individual transactions.
+      * "Остаток на 13.10.23 составило 352.839 сум" - a balance-as-of-date
+        snapshot. Distinguished from "Начислен остаток зарплаты" (a real
+        income transaction) by requiring a digit right after "на".
+      * "Расход на период с 29.09 по 13.10.23 составило 5.768.000 сум" -
+        a period-expense recap, same double-counting problem.
   - Every category is "Прочее" (Other), picked separately for INCOME and
     EXPENSE since the schema has one "Прочее" per type.
+  - A few messages like "Начислено занял" / "Зачислено занял Исроил" are
+    personal loans received, tagged INCOME because they use the same
+    "начислено"/"зачислено" wording as real income - reasonable for a
+    simple two-type (money in / money out) tracker, but worth knowing if
+    you want to recategorize them later.
+  - Some (date, amount, comment) triples repeat exactly (e.g. two 24.000
+    "такси" charges on the same day) - these are real, separate
+    transactions that happen to have identical values, not parsing
+    duplicates, so the script does not deduplicate them.
   - Import is not idempotent: running --import twice creates duplicate
     transactions. This is a one-off migration script, not something meant
     to be re-run.
@@ -53,19 +87,43 @@ except ImportError:
 
 EXPORT_FILES = ["messages.html", "messages2.html", "messages3.html", "messages4.html"]
 
-INCOME_KEYWORDS = [
-    "начислен", "начислили", "начислена",
-    "зарплата", "зарплату", "зп",
-    "премия", "премию",
-    "получил", "получила", "получено",
-    "поступил", "поступила", "поступление",
-    "зачислен", "зачислили",
-    "доход",
-]
+# Stems, not full words: Russian declines (зарплата/зарплаты/зарплату/...),
+# so a stem substring check catches all cases in one entry. Matched against
+# real export data - "начисл" alone covers начислено/начислена/начислили/
+# начисление, "зарплат" covers every case ending, etc.
+# "прем" needs a (?!иум) guard: "премия"(bonus, income) vs "премиум" (a
+# Telegram Premium subscription payment, seen in the real data as an
+# EXPENSE - "тг премиум" / "премиум тг" - which the bare stem "прем" would
+# wrongly catch too).
+INCOME_PATTERNS = [re.compile(p, re.IGNORECASE) for p in [
+    r"начисл",   # начислен(о/а/ы)/начислили/начисление
+    r"зачисл",   # зачислен(о)/зачислили
+    r"зарплат",  # зарплата/зарплаты/зарплату/зарплате
+    r"прем(?!иум)",  # премия/премию/премии, but not "премиум"
+    r"аванс",    # advance pay - always income even without начисл nearby
+    r"доход",
+    r"получ",    # получил/получила/получено
+    r"поступ",   # поступил/поступление
+]]
 
+# Balance-report lines ("Баланс на данный момент ...", "Оьщий баланс ...",
+# "Текущий баланс ...") always contain "баланс" as a standalone word, in any
+# order/typo, so match on that rather than a fixed phrase. Word-boundaried
+# so it does NOT match "балансировка" (wheel balancing - a real EXPENSE seen
+# in the actual export data, not a balance report).
+#   - "Итого 1.485.000 сум" / "Итого начислено за октябрь 7.515.700 сум"
+#     are period rollups that double-count amounts already captured as
+#     their own individual transactions.
+#   - "Остаток на 13.10.23 составило 352.839 сум" is a balance-as-of-date
+#     snapshot, not "остаток зарплаты" (salary remainder, a real income
+#     transaction) - the \d after "на" is what distinguishes them.
+#   - "Расход на период с 29.09 по 13.10.23 составило 5.768.000 сум" is a
+#     period-expense recap, same double-counting problem.
 SKIP_PATTERNS = [
-    re.compile(r"баланс.*составляет", re.IGNORECASE),
-    re.compile(r"текущий баланс", re.IGNORECASE),
+    re.compile(r"\bбаланс\b", re.IGNORECASE),
+    re.compile(r"\bитого\b", re.IGNORECASE),
+    re.compile(r"остаток\s+на\s+\d", re.IGNORECASE),
+    re.compile(r"на период.*составил", re.IGNORECASE),
 ]
 
 # Requires at least one thousands-grouping dot (e.g. 50.000, 5.650.300).
@@ -89,8 +147,7 @@ class ParsedTransaction:
 
 
 def classify_type(text: str) -> str:
-    lower = text.lower()
-    return "INCOME" if any(kw in lower for kw in INCOME_KEYWORDS) else "EXPENSE"
+    return "INCOME" if any(p.search(text) for p in INCOME_PATTERNS) else "EXPENSE"
 
 
 def should_skip(text: str) -> bool:
