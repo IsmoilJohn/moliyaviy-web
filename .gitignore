@@ -28,3 +28,6 @@ __pycache__/
 
 # Logs
 *.log
+
+# Local scratch space (DB dumps etc. - never commit real data/secrets)
+scratch/

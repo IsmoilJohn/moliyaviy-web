@@ -117,3 +117,26 @@ cd frontend && npm run build
 ```
 
 Также доступны `Dockerfile` в `backend/` и `frontend/` для сборки контейнерных образов.
+
+## Деплой backend (Railway)
+
+Активируется профилем `SPRING_PROFILES_ACTIVE=prod`, конфиг — в
+`application-prod.yml`:
+
+- **Подключение к БД**: приоритетный вариант — переменные `PGHOST`,
+  `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD` (их даёт плагин Postgres
+  в Railway). Если задан только `DATABASE_URL`
+  (`postgres://user:pass@host:port/db`) — `DatabaseUrlEnvironmentPostProcessor`
+  сам конвертирует его в JDBC-урл, оба варианта работают из коробки.
+- **Порт**: `server.port: ${PORT:8080}` в базовом `application.yml` — Railway
+  подставляет свой `PORT`, локально используется дефолт `8080`.
+- **JWT**: `JWT_SECRET` обязателен в `prod`-профиле (без дефолта — сервис не
+  запустится без него, чтобы не работать на dev-секрете в продакшене).
+- **Flyway**: `baseline-on-migrate: true` + `baseline-version: 2` — если
+  схема уже накатана вручную (например, через `pg_dump`/`psql`) и таблица
+  `flyway_schema_history` есть в дампе, это no-op; это подстраховка на
+  случай, если её там нет.
+
+Обязательные переменные окружения сервиса backend в Railway:
+`SPRING_PROFILES_ACTIVE=prod`, `JWT_SECRET`, и либо `PGHOST`/`PGPORT`/
+`PGDATABASE`/`PGUSER`/`PGPASSWORD`, либо `DATABASE_URL`.

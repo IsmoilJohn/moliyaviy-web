@@ -1,0 +1,20 @@
+# Activated with SPRING_PROFILES_ACTIVE=prod (see DatabaseUrlEnvironmentPostProcessor
+# for the DATABASE_URL fallback when PGHOST/PGPORT/... aren't set directly).
+spring:
+  datasource:
+    url: jdbc:postgresql://${PGHOST}:${PGPORT}/${PGDATABASE}?stringtype=unspecified
+    username: ${PGUSER}
+    password: ${PGPASSWORD}
+  flyway:
+    # The schema was already created from a manual pg_dump that includes
+    # flyway_schema_history, so this is normally a no-op. It's a safety net
+    # in case that table is ever missing: baseline at V2 (current schema)
+    # instead of failing or trying to re-run V1/V2 against existing tables.
+    baseline-on-migrate: true
+    baseline-version: 2
+
+app:
+  jwt:
+    # No default here on purpose: fail fast at startup rather than silently
+    # run production on the dev-only secret from application.yml.
+    secret: ${JWT_SECRET}
