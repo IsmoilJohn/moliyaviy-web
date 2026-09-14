@@ -140,3 +140,36 @@ cd frontend && npm run build
 Обязательные переменные окружения сервиса backend в Railway:
 `SPRING_PROFILES_ACTIVE=prod`, `JWT_SECRET`, и либо `PGHOST`/`PGPORT`/
 `PGDATABASE`/`PGUSER`/`PGPASSWORD`, либо `DATABASE_URL`.
+
+Также нужно добавить `CORS_ALLOWED_ORIGINS` — публичный домен фронтенда
+(если он задеплоен отдельным сервисом/на другом хосте), иначе браузер
+заблокирует запросы. Для нескольких доменов — через запятую.
+
+## Деплой frontend
+
+Frontend — статический SPA (Vue 3 + Vite), собирается в контейнере с nginx
+(`frontend/Dockerfile`) и отдаёт `index.html` на все пути, кроме статики
+(`frontend/nginx.conf`) — нужно для клиентского роутинга (`/login` и т.д.
+не должны отдавать 404 при прямом переходе или обновлении страницы).
+
+Backend и frontend в проде — разные origin (разные Railway-сервисы/домены),
+поэтому:
+
+- **`VITE_API_URL`** — публичный URL backend-сервиса (например,
+  `https://backend-production-xxxx.up.railway.app`, без `/api` в конце).
+  Это **build-time** переменная — Vite вставляет её в статический бандл при
+  сборке, изменить после сборки контейнера уже нельзя. На Railway она
+  автоматически подставится в `docker build` как build-arg, если задать
+  переменную сервиса с тем же именем — просто добавьте её в Variables
+  фронтенд-сервиса.
+- На backend-сервисе не забудьте выставить **`CORS_ALLOWED_ORIGINS`**
+  на публичный домен фронтенда (см. выше) — иначе запросы с фронтенда
+  будут блокироваться браузером (проверено: без совпадения origin
+  бэкенд отвечает `403 Invalid CORS request` на preflight).
+
+Локальная сборка с той же конфигурацией:
+
+```bash
+cd frontend
+VITE_API_URL=https://your-backend.example.com npm run build
+```
